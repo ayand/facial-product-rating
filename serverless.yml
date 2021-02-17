@@ -26,7 +26,7 @@ provider:
 
 functions:
   parse_face:
-    handler: handler.parse_face
+    handler: facial-reaction-parser/handler.parse_face
     events:
       - s3:
           bucket: ${self:provider.environment.S3_BUCKET}
