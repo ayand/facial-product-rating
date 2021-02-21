@@ -10,6 +10,7 @@ provider:
   environment:
     DYNAMODB_TABLE: # DynamoDB table name
     S3_BUCKET: # S3 bucket name
+    SNS_TOPIC_ARN: # SNS topic ARN
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -23,10 +24,15 @@ provider:
       Action:
         - rekognition:DetectFaces
       Resource: "*"
+    - Effect: Allow
+      Action:
+        - sns:Publish
+        - sns:Subscribe
+      Resource: "${self:provider.environment.SNS_TOPIC_ARN}"
 
 functions:
   parse_face:
-    handler: facial-reaction-parser/handler.parse_face
+    handler: facial-reaction-parser/handler.handler
     events:
       - s3:
           bucket: ${self:provider.environment.S3_BUCKET}
@@ -34,6 +40,10 @@ functions:
           rules:
             - suffix: .jpg
           existing: true
+  write_to_dynamodb:
+    handler: dynamodb-writer/handler.handler
+    events:
+      - sns: ${self:provider.environment.SNS_TOPIC_ARN}
 
 resources:
   Resources:
