@@ -2,7 +2,6 @@ import json
 import boto3
 import time
 import os
-from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb').Table(os.environ['DYNAMODB_TABLE'])
 
@@ -13,7 +12,7 @@ def write_to_dynamodb(body):
         "userId": body["userId"],
         "emotion": body["emotion"],
         "url": body["url"],
-        "timestamp": datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+        "timestamp": body["timestamp"]
     }
     response = dynamodb.put_item(Item=payload)
     print("Finished writing")

@@ -2,6 +2,7 @@ import json
 import boto3
 import time
 import os
+from datetime import datetime
 
 rekognition = boto3.client('rekognition')
 s3 = boto3.client('s3')
@@ -32,7 +33,8 @@ def build_data_point(product_id, user_id, emotion, gender, age, url):
         "emotion": emotion,
         "gender": gender,
         "age": age,
-        "url": url
+        "url": url,
+        "timestamp": datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     }
     return body
 
