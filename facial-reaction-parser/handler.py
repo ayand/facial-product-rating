@@ -8,6 +8,7 @@ rekognition = boto3.client('rekognition')
 s3 = boto3.client('s3')
 sns = boto3.client('sns')
 
+
 def analyze_face(bucket, key):
     facial_analysis = rekognition.detect_faces(Image={'S3Object':{'Bucket':bucket,'Name':key}},Attributes=['ALL'])
     face = facial_analysis["FaceDetails"][0]
@@ -18,12 +19,14 @@ def analyze_face(bucket, key):
     approx_age = (face["AgeRange"]["Low"] + face["AgeRange"]["High"]) / 2
     return (primary_emotion, gender, approx_age,)
 
+
 def get_product_and_user(key):
     # Format of key: products/<product-id>/ratings/rating_user_<user-id>.jpg
     components = key.split("/")
     product_id = components[-3]
-    user_id = components[-1].replace(".jpg", "").split("_")[2]
+    user_id = "_".join(components[-1].replace(".jpg", "").split("_")[2:])
     return (product_id, user_id,)
+
 
 def build_data_point(product_id, user_id, emotion, gender, age, url):
     body = {
@@ -37,6 +40,7 @@ def build_data_point(product_id, user_id, emotion, gender, age, url):
         "timestamp": datetime.now(timezone.utc).strftime("%m/%d/%Y, %H:%M:%S")
     }
     return body
+
 
 def handler(event, context):
     """ Parse newly created objects and analyze a face for emotion, gender, and age """

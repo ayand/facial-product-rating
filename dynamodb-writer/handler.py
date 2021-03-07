@@ -5,6 +5,7 @@ import os
 
 dynamodb = boto3.resource('dynamodb').Table(os.environ['DYNAMODB_TABLE'])
 
+
 def write_to_dynamodb(body):
     payload = {
         "id": body["id"],
@@ -17,6 +18,7 @@ def write_to_dynamodb(body):
     response = dynamodb.put_item(Item=payload)
     print("Finished writing")
     return response
+
 
 def handler(event, context):
     message = event['Records'][0]['Sns']['Message']

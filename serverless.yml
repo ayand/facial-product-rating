@@ -22,6 +22,10 @@ provider:
       Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
     - Effect: Allow
       Action:
+        - s3:PutObject
+      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
+    - Effect: Allow
+      Action:
         - rekognition:DetectFaces
       Resource: "*"
     - Effect: Allow
@@ -44,6 +48,13 @@ functions:
     handler: dynamodb-writer/handler.handler
     events:
       - sns: ${self:provider.environment.SNS_TOPIC_ARN}
+  upload_image:
+    handler: image-uploader/handler.handler
+    events:
+      - http:
+          path: users/{userId}/ratings
+          method: post
+          cors: true
 
 resources:
   Resources:
