@@ -4,10 +4,10 @@ This project introduces a new, fun way to collect user feedback on a variety of 
 
 ## image-uploader
 
-This function provides a REST interface for uploading images to S3. Note: these images must specifically be jpg files. The images are uploaded through a POST request at a URL with this format: ** (URL provided by AWS)/users/(user ID)/ratings **. The request body has to have the two following parameters:
+This function provides a REST interface for uploading images to S3. Note: these images must specifically be jpg files. The images are uploaded through a POST request at a URL with this format: **(URL provided by AWS)/users/(user ID)/ratings**. The request body has to have the two following parameters:
 
-* ** productId ** : The ID of the product being rated
-* ** image_data ** The base64 encoded string of the image being uploaded
+* **productId** : The ID of the product being rated
+* **image_data** The base64 encoded string of the image being uploaded
 
 ## facial-reaction-parser
 
