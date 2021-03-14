@@ -5,12 +5,12 @@ frameworkVersion: '2'
 provider:
   name: aws
   runtime: python3.8
-  region: # region
+  region: us-east-1
   profile: # profile name
   environment:
-    DYNAMODB_TABLE: # DynamoDB table name
-    S3_BUCKET: # S3 bucket name
-    SNS_TOPIC_ARN: # SNS topic ARN
+    DYNAMODB_TABLE: ${ssm:/FacialProductRating/DYNAMODB_TABLE}
+    S3_BUCKET:  ${ssm:/FacialProductRating/S3-Bucket}
+    SNS_TOPIC_ARN: ${ssm:/FacialProductRating/SNS_ARN}
   iamRoleStatements:
     - Effect: Allow
       Action:
