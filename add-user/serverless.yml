@@ -1,0 +1,55 @@
+service: facial-rating-add-user
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-east-1
+  profile: # profile name
+  environment:
+    S3_BUCKET:  ${ssm:/FacialProductRating/COLLECTION_S3_BUCKET}
+    DYNAMODB_TABLE: ${ssm:/FacialProductRating/COLLECTION_DYNAMODB_TABLE}
+    FACIAL_RATING_COLLECTION: ${ssm:/FacialProductRating/FACIAL_RATING_COLLECTION}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
+    - Effect: Allow
+      Action:
+        - rekognition:DetectFaces
+        - rekognition:IndexFaces
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+      Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+
+functions:
+  add_user:
+    handler: handler.handler
+    events:
+      - http:
+          path: users/
+          method: post
+          cors: true
+
+resources:
+  Resources:
+    FacialCollectionDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: id
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}

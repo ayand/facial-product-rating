@@ -42,7 +42,6 @@ def handler(event, context):
         }
     except Exception as e:
         return {
-
             'statusCode': 500,
             "headers": {"status": "bad"},
             'body': json.dumps({"error_message": str(e)})
