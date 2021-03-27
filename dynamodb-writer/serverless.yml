@@ -1,4 +1,4 @@
-service: facial-reaction-parser
+service: dynamodb-writer
 
 frameworkVersion: '2'
 
@@ -9,7 +9,6 @@ provider:
   profile: # profile name
   environment:
     DYNAMODB_TABLE: ${ssm:/FacialProductRating/DYNAMODB_TABLE}
-    S3_BUCKET:  ${ssm:/FacialProductRating/S3-Bucket}
     SNS_TOPIC_ARN: ${ssm:/FacialProductRating/SNS_ARN}
   iamRoleStatements:
     - Effect: Allow
@@ -18,43 +17,14 @@ provider:
       Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
     - Effect: Allow
       Action:
-        - s3:GetObject
-      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
-    - Effect: Allow
-      Action:
-        - s3:PutObject
-      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
-    - Effect: Allow
-      Action:
-        - rekognition:DetectFaces
-      Resource: "*"
-    - Effect: Allow
-      Action:
-        - sns:Publish
         - sns:Subscribe
       Resource: "${self:provider.environment.SNS_TOPIC_ARN}"
 
 functions:
-  parse_face:
-    handler: facial-reaction-parser/handler.handler
-    events:
-      - s3:
-          bucket: ${self:provider.environment.S3_BUCKET}
-          event: s3:ObjectCreated:*
-          rules:
-            - suffix: .jpg
-          existing: true
   write_to_dynamodb:
-    handler: dynamodb-writer/handler.handler
+    handler: handler.handler
     events:
       - sns: ${self:provider.environment.SNS_TOPIC_ARN}
-  upload_image:
-    handler: image-uploader/handler.handler
-    events:
-      - http:
-          path: users/{userId}/ratings
-          method: post
-          cors: true
 
 resources:
   Resources:

@@ -1,0 +1,25 @@
+service: image-uploader
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-east-1
+  profile: # profile name
+  environment:
+    S3_BUCKET:  ${ssm:/FacialProductRating/S3-Bucket}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: "arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*"
+
+functions:
+  upload_image:
+    handler: handler.handler
+    events:
+      - http:
+          path: users/{userId}/ratings
+          method: post
+          cors: true
