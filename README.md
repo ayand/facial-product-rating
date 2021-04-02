@@ -6,14 +6,16 @@ The system also uses a Rekognition Face collection as part of an authentication 
 
 ## Parameters
 
-This function takes advantage of parameters stored in AWS Systems Manager's Parameter Store. Make sure to set the following parameters in your account before usage:
+This function takes advantage of parameters stored in AWS Systems Manager's Parameter Store.
 
-* **/FacialProductRating/DYNAMODB_TABLE**: The name of the DynamoDB table where rating information will be stored. This will be created by the Serverless deploy.
+Make sure to run the script **supporting_scripts/setup.py** to set up the necessary resources and parameters before usage:
+
+* **/FacialProductRating/RATING_DYNAMODB_TABLE**: The name of the DynamoDB table where rating information will be stored.
 * **/FacialProductRating/COLLECTION_DYNAMODB_TABLE**: The name of the DynamoDB table where users' Rekognition collection ID's are stored for authentication
-* **/FacialProductRating/S3-Bucket**: The name of the S3 bucket where images will be uploaded and from which PUT events will be monitored for using Rekognition. **Note: This S3 bucket must be created beforehand.**
+* **/FacialProductRating/RATING_S3_BUCKET**: The name of the S3 bucket where images will be uploaded and from which PUT events will be monitored for using Rekognition.
 * **/FacialProductRating/COLLECTION_S3_BUCKET**: The name of the S3 bucket where images of users are stored in preparation for registering their faces as part of the collection.
-* **/FacialProductRating/SNS_ARN**: The ARN of the SNS topic to which Rekognition output will be pushed for consumption by downstream services. **Note: This SNS topic must be created beforehand.**
-* **/FacialProductRating/FACIAL_RATING_COLLECTION** The name of the Rekognition face collection where users' faces are stored. This collection is created and its name is stored in Parameter Store by the script **supporting_scripts/create_collection.py**.
+* **/FacialProductRating/SNS_ARN**: The ARN of the SNS topic to which Rekognition output will be pushed for consumption by downstream services.
+* **/FacialProductRating/FACIAL_RATING_COLLECTION** The name of the Rekognition face collection where users' faces are stored.
 
 ## Functions
 

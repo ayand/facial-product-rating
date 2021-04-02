@@ -5,10 +5,10 @@ frameworkVersion: '2'
 provider:
   name: aws
   runtime: python3.8
-  region: us-east-1
+  region: # Specify region used in supporting_scripts/setup.py
   profile: # profile name
   environment:
-    DYNAMODB_TABLE: ${ssm:/FacialProductRating/DYNAMODB_TABLE}
+    DYNAMODB_TABLE: ${ssm:/FacialProductRating/RATING_DYNAMODB_TABLE}
     SNS_TOPIC_ARN: ${ssm:/FacialProductRating/SNS_ARN}
   iamRoleStatements:
     - Effect: Allow
@@ -25,22 +25,3 @@ functions:
     handler: handler.handler
     events:
       - sns: ${self:provider.environment.SNS_TOPIC_ARN}
-
-resources:
-  Resources:
-    FacialRatingDynamoDbTable:
-      Type: 'AWS::DynamoDB::Table'
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          -
-            AttributeName: id
-            AttributeType: S
-        KeySchema:
-          -
-            AttributeName: id
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.DYNAMODB_TABLE}
