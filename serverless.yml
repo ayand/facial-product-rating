@@ -1,0 +1,189 @@
+service: facial-product-rating-new
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-east-1
+  profile: # Specify profile name here
+  environment:
+    ratingDynamoDBTable: ${self:custom.ratingDynamoDBTable}
+    collectionDynamoDBTable: ${self:custom.collectionDynamoDBTable}
+    ratingLandingS3Bucket: ${self:custom.ratingLandingS3Bucket}
+    ratingS3Bucket: ${self:custom.ratingS3Bucket}
+    collectionS3Bucket: ${self:custom.collectionS3Bucket}
+    facialRatingSNSTopic: arn:aws:sns:${self:custom.region}:${self:custom.accountId}:${self:custom.facialRatingSNSTopic}
+
+functions:
+  parse_face:
+    role: FacialReactionParserRole
+    handler: facial-reaction-parser/handler.handler
+    events:
+      - s3:
+          bucket: ${self:provider.environment.ratingS3Bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .jpg
+          existing: true
+  write_to_dynamodb:
+    role: DynamoDBWriterRole
+    handler: dynamodb-writer/handler.handler
+    events:
+      - sns: ${self:provider.environment.facialRatingSNSTopic}
+
+custom:
+  ratingDynamoDBTable: facial-product-ratings
+  collectionDynamoDBTable: facial-collection
+  ratingLandingS3Bucket: ayandas24-facial-rating-storage-landing
+  ratingS3Bucket: ayandas24-facial-rating-storage
+  collectionS3Bucket: ayandas24-user-image-collection
+  facialRatingSNSTopic: facialRatingSNSTopic
+  region: us-east-1
+  accountId: # Specify account ID here.
+
+resources:
+  Resources:
+    RatingS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.ratingS3Bucket}
+        AccessControl: PublicRead
+    RatingLandingS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.ratingLandingS3Bucket}
+        AccessControl: PublicRead
+    CollectionS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.collectionS3Bucket}
+        AccessControl: PublicRead
+    RatingDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: id
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: id
+            KeyType: HASH
+        BillingMode: 'PAY_PER_REQUEST'
+        TableName: ${self:custom.ratingDynamoDBTable}
+    CollectionDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: id
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: id
+            KeyType: HASH
+        BillingMode: 'PAY_PER_REQUEST'
+        TableName: ${self:custom.collectionDynamoDBTable}
+    FacialRatingSNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:custom.facialRatingSNSTopic}
+    FacialReactionParserRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /facialProductRating/facialReactionParser/
+        RoleName: FacialReactionParserRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: FacialReactionParserPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: "arn:aws:s3:::${self:custom.ratingS3Bucket}/*"
+                - Effect: Allow
+                  Action:
+                    - rekognition:DetectFaces
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - sns:Publish
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:sns'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - ${self:custom.facialRatingSNSTopic}
+    DynamoDBWriterRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /facialProductRating/dynamoDBWriter/
+        RoleName: DynamoDBWriterRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: FacialReactionParserPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action:
+                    - dynamodb:PutItem
+                  Resource: "arn:aws:dynamodb:${self:custom.region}:${self:custom.accountId}:table/${self:custom.ratingDynamoDBTable}"
+                - Effect: Allow
+                  Action:
+                    - sns:Subscribe
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:sns'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - ${self:custom.facialRatingSNSTopic}

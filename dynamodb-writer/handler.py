@@ -3,7 +3,7 @@ import boto3
 import time
 import os
 
-dynamodb = boto3.resource('dynamodb').Table(os.environ['DYNAMODB_TABLE'])
+dynamodb = boto3.resource('dynamodb').Table(os.environ['ratingDynamoDBTable'])
 
 
 def write_to_dynamodb(body):

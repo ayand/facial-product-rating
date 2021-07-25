@@ -2,24 +2,17 @@
 
 This project introduces a new, fun way to collect user feedback on a variety of products (movies, electronics, clothing, etc). The concept is to upload pictures of users' faces, expressing their reaction (happy, angry, disgusted, etc), to the cloud via a phone app. The pictures are then scanned by AWS Rekognition to detect the facial expressions and record the reactions of users to products. Using Rekognition would allow for users to collect extra characteristics about a user such as their gender and approximate age. Collecting such characteristics at one go and storing them in a data warehouse would allow for future user segmentation analysis and possibly better marketing. These services could also be expanded to include latitude and longitude of a given user in order to allow a geographical breakdown of user reactions as well.
 
-The system also uses a Rekognition Face collection as part of an authentication procedure to make sure that another person cannot put in a facial rating for a user.
+The system also uses a Rekognition Face collection as part of an authentication procedure to make sure that another person cannot put in a facial rating for a user. Make sure to run **supporting_scripts/setup.py** in order to set up this collection.
 
-## Parameters
+To set up all of the infrastructure for this project, make sure you have the **Serverless** utility installed and that you have an AWS profile configured beforehand. Then run the following command:
 
-This function takes advantage of parameters stored in AWS Systems Manager's Parameter Store.
-
-Make sure to run the script **supporting_scripts/setup.py** to set up the necessary resources and parameters before usage:
-
-* **/FacialProductRating/RATING_DYNAMODB_TABLE**: The name of the DynamoDB table where rating information will be stored.
-* **/FacialProductRating/COLLECTION_DYNAMODB_TABLE**: The name of the DynamoDB table where users' Rekognition collection ID's are stored for authentication
-* **/FacialProductRating/RATING_S3_BUCKET**: The name of the S3 bucket where images will be uploaded and from which PUT events will be monitored for using Rekognition.
-* **/FacialProductRating/COLLECTION_S3_BUCKET**: The name of the S3 bucket where images of users are stored in preparation for registering their faces as part of the collection.
-* **/FacialProductRating/SNS_ARN**: The ARN of the SNS topic to which Rekognition output will be pushed for consumption by downstream services.
-* **/FacialProductRating/FACIAL_RATING_COLLECTION** The name of the Rekognition face collection where users' faces are stored.
+```
+serverless deploy -v
+```
 
 ## Functions
 
-### add-user
+<!--### add-user
 
 This function provides a REST interface for registering users' faces into Rekognition for future authentication. This function supports a POST request at a URL that follows this format: **(URL provided by AWS)/users**. The request body has to have the following two parameters:
 
@@ -31,7 +24,7 @@ This function provides a REST interface for registering users' faces into Rekogn
 This function provides a REST interface for uploading images to S3. Note: these images must specifically be jpg files. The images are uploaded through a POST request at a URL with this format: **(URL provided by AWS)/users/(user ID)/ratings**. The request body has to have the two following parameters:
 
 * **productId**: The ID of the product being rated
-* **image_data**: The base64 encoded string of the image being uploaded
+* **image_data**: The base64 encoded string of the image being uploaded-->
 
 ### facial-reaction-parser
 

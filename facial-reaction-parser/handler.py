@@ -55,6 +55,6 @@ def handler(event, context):
 
     body = build_data_point(product_id, user_id, emotion, gender, age, url)
 
-    sns_response = sns.publish(TopicArn=os.environ['SNS_TOPIC_ARN'], Message=json.dumps(body))
+    sns_response = sns.publish(TopicArn=os.environ['facialRatingSNSTopic'], Message=json.dumps(body))
 
     return sns_response
