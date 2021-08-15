@@ -14,6 +14,7 @@ provider:
     ratingS3Bucket: ${self:custom.ratingS3Bucket}
     collectionS3Bucket: ${self:custom.collectionS3Bucket}
     facialRatingSNSTopic: arn:aws:sns:${self:custom.region}:${self:custom.accountId}:${self:custom.facialRatingSNSTopic}
+    firehoseStream: ${self:custom.kinesisFirehoseStream}
 
 functions:
   parse_face:
@@ -31,6 +32,11 @@ functions:
     handler: dynamodb-writer/handler.handler
     events:
       - sns: ${self:provider.environment.facialRatingSNSTopic}
+  write_to_firehose:
+    role: S3WriterRole
+    handler: athena-storage/handler.handler
+    events:
+      - sns: ${self:provider.environment.facialRatingSNSTopic}
 
 custom:
   ratingDynamoDBTable: facial-product-ratings
@@ -38,9 +44,12 @@ custom:
   ratingLandingS3Bucket: ayandas24-facial-rating-storage-landing
   ratingS3Bucket: ayandas24-facial-rating-storage
   collectionS3Bucket: ayandas24-user-image-collection
+  analyticsBucket: facial-rating-analytics-bucket
   facialRatingSNSTopic: facialRatingSNSTopic
   region: us-east-1
   accountId: # Specify account ID here.
+  kinesisStream: facialReactionStream
+  kinesisFirehoseStream: facialReactionFirehoseStream
 
 resources:
   Resources:
@@ -59,6 +68,12 @@ resources:
       Properties:
         BucketName: ${self:custom.collectionS3Bucket}
         AccessControl: PublicRead
+    AnalysisBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.analyticsBucket}
+        VersioningConfiguration:
+          Status: Enabled
     RatingDynamoDBTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Delete
@@ -155,7 +170,7 @@ resources:
                   - lambda.amazonaws.com
               Action: sts:AssumeRole
         Policies:
-          - PolicyName: FacialReactionParserPolicy
+          - PolicyName: DynamoDBWriterPolicy
             PolicyDocument:
               Version: '2012-10-17'
               Statement:
@@ -176,6 +191,202 @@ resources:
                   Action:
                     - dynamodb:PutItem
                   Resource: "arn:aws:dynamodb:${self:custom.region}:${self:custom.accountId}:table/${self:custom.ratingDynamoDBTable}"
+                - Effect: Allow
+                  Action:
+                    - sns:Subscribe
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:sns'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - ${self:custom.facialRatingSNSTopic}
+    FirehoseDeliveryRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /facialProductRating/firehoseDelivery/
+        RoleName: FirehoseDelivery
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: ''
+              Effect: Allow
+              Principal:
+                Service: firehose.amazonaws.com
+              Action: 'sts:AssumeRole'
+              Condition:
+                StringEquals:
+                  'sts:ExternalId': !Ref 'AWS::AccountId'
+    FirehoseDeliveryPolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: FacialCollectionAnalyticsDelivery
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - 's3:AbortMultipartUpload'
+                - 's3:GetBucketLocation'
+                - 's3:GetObject'
+                - 's3:ListBucket'
+                - 's3:ListBucketMultipartUploads'
+                - 's3:PutObject'
+              Resource:
+                - 'arn:aws:s3:::${self:custom.analyticsBucket}'
+                - 'arn:aws:s3:::${self:custom.analyticsBucket}*'
+            - Effect: Allow
+              Action: 'glue:GetTableVersions'
+              Resource: '*'
+            - Effect: Allow
+              Action: 'logs:PutLogEvents'
+              Resource:
+                - !Join
+                  - ''
+                  - - 'arn:aws:logs:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - 'log-group:/aws/kinesisfirehose/KDF-'
+                    - !Ref GlueTable
+                    - ':log-stream:*'
+        Roles:
+          - !Ref FirehoseDeliveryRole
+    DataFirehoseStream:
+      DependsOn:
+        - FirehoseDeliveryPolicy
+      Type: AWS::KinesisFirehose::DeliveryStream
+      Properties:
+        DeliveryStreamName: ${self:custom.kinesisFirehoseStream}
+        DeliveryStreamType: DirectPut
+        ExtendedS3DestinationConfiguration:
+          BucketARN: !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref AnalysisBucket
+          Prefix: !Join
+            - ''
+            - - !Ref GlueTable
+              - '/year=!{timestamp:YYYY}/month=!{timestamp:MM}/day=!{timestamp:dd}/'
+          ErrorOutputPrefix: !Join
+            - ''
+            - - !Ref GlueTable
+              -  'error/!{firehose:error-output-type}/year=!{timestamp:YYYY}/month=!{timestamp:MM}/day=!{timestamp:dd}/'
+          BufferingHints:
+            IntervalInSeconds: '60'
+            SizeInMBs: '64'
+          CompressionFormat: UNCOMPRESSED
+          RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+          EncryptionConfiguration:
+            NoEncryptionConfig: NoEncryption
+          CloudWatchLoggingOptions:
+            Enabled: true
+            LogGroupName: !Join
+              - ''
+              - - 'KDF-'
+                - !Ref GlueTable
+            LogStreamName: S3Delivery
+          S3BackupMode: Disabled
+          DataFormatConversionConfiguration:
+            SchemaConfiguration:
+              CatalogId: !Ref AWS::AccountId
+              RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+              DatabaseName: !Ref GlueDatabase
+              TableName: !Ref GlueTable
+              Region: !Ref AWS::Region
+              VersionId: LATEST
+            InputFormatConfiguration:
+              Deserializer:
+                OpenXJsonSerDe: {}
+            OutputFormatConfiguration:
+              Serializer:
+                ParquetSerDe: {}
+    GlueDatabase:
+      Type: AWS::Glue::Database
+      Properties:
+        CatalogId: !Ref AWS::AccountId
+        DatabaseInput:
+          Name: facialratings
+    GlueTable:
+      Type: AWS::Glue::Table
+      Properties:
+        CatalogId: !Ref AWS::AccountId
+        DatabaseName: !Ref GlueDatabase
+        TableInput:
+          Name: facialratingsdata
+          StorageDescriptor:
+            Columns:
+            - Name: id
+              Type: string
+            - Name: productId
+              Type: string
+            - Name: userId
+              Type: string
+            - Name: emotion
+              Type: string
+            - Name: gender
+              Type: string
+            - Name: age
+              Type: int
+            - Name: timestamp
+              Type: timestamp
+            InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+            OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+            Compressed: false
+            NumberOfBuckets: -1
+            SerdeInfo:
+              SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+              Parameters:
+                serialization.format: '1'
+            BucketColumns: []
+            SortColumns: []
+            StoredAsSubDirectories: false
+          PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
+          TableType: EXTERNAL_TABLE
+    S3WriterRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /facialProductRating/s3Writer/
+        RoleName: S3WriterRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: S3WriterPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action:
+                    - firehose:PutRecord
+                  Resource: "arn:aws:firehose:${self:custom.region}:${self:custom.accountId}:deliverystream/${self:custom.kinesisFirehoseStream}"
                 - Effect: Allow
                   Action:
                     - sns:Subscribe

@@ -37,7 +37,7 @@ def build_data_point(product_id, user_id, emotion, gender, age, url):
         "gender": gender,
         "age": age,
         "url": url,
-        "timestamp": datetime.now(timezone.utc).strftime("%m/%d/%Y, %H:%M:%S")
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     }
     return body
 

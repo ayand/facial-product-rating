@@ -3,18 +3,22 @@ import boto3
 import time
 import os
 
-dynamodb = boto3.resource('dynamodb').Table(os.environ['ratingDynamoDBTable'])
+client = boto3.client('firehose')
+firehose_stream = os.environ['firehoseStream']
 
-def write_to_dynamodb(body):
-    payload = {
+def write_to_firehose(body):
+    payload = json.dumps({
         "id": body["id"],
         "productId": body["productId"],
         "userId": body["userId"],
         "emotion": body["emotion"],
-        "url": body["url"],
+        "gender": body["gender"],
+        "age": int(body["age"]),
         "timestamp": body["timestamp"]
-    }
-    response = dynamodb.put_item(Item=payload)
+    })
+    print(payload)
+    kinesis_payload = { "Data": payload }
+    response = client.put_record(DeliveryStreamName=firehose_stream, Record=kinesis_payload)
     print("Finished writing")
     return response
 
@@ -22,5 +26,5 @@ def write_to_dynamodb(body):
 def handler(event, context):
     message = event['Records'][0]['Sns']['Message']
     body = json.loads(message)
-    response = write_to_dynamodb(body)
+    response = write_to_firehose(body)
     return response
